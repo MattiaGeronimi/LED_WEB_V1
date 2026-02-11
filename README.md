@@ -1,0 +1,9 @@
+CIRCUITO
+STM | ESP
+PA9 → RX
+PA10 → TX
+3V3 → VCC
+3V3 → CH_PD
+GND → GND
+GPIO0 → 3V3 
+RST → 3V3 
