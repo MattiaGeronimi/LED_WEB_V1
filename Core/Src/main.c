@@ -93,7 +93,11 @@ int main(void)
   MX_USART1_UART_Init();
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
+
   ESP_Init("FABLAB-2-4", "fablab26");
+
+  ESP_Init("ESP", "12345678");
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
