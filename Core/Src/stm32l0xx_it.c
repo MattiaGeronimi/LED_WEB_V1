@@ -149,6 +149,7 @@ void USART1_IRQHandler(void)
   /* USER CODE BEGIN USART1_IRQn 0 */
 	Uart_isr (&huart1);
   /* USER CODE END USART1_IRQn 0 */
+<<<<<<< HEAD
   HAL_UART_IRQHandler(&huart1);
   /* USER CODE BEGIN USART1_IRQn 1 */
 
@@ -164,6 +165,23 @@ void USART2_IRQHandler(void)
 	Uart_isr (&huart2);
   /* USER CODE END USART2_IRQn 0 */
   HAL_UART_IRQHandler(&huart2);
+=======
+  //HAL_UART_IRQHandler(&huart1);
+  /* USER CODE BEGIN USART1_IRQn 1 */
+
+  /* USER CODE END USART1_IRQn 1 */
+}
+
+/**
+  * @brief This function handles USART2 global interrupt / USART2 wake-up interrupt through EXTI line 26.
+  */
+void USART2_IRQHandler(void)
+{
+  /* USER CODE BEGIN USART2_IRQn 0 */
+	Uart_isr (&huart2);
+  /* USER CODE END USART2_IRQn 0 */
+ // HAL_UART_IRQHandler(&huart2);
+>>>>>>> branch 'master' of https://github.com/MattiaGeronimi/LED_WEB_V1.git
   /* USER CODE BEGIN USART2_IRQn 1 */
 
   /* USER CODE END USART2_IRQn 1 */
