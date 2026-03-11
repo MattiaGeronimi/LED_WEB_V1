@@ -24,7 +24,9 @@
 #include <errno.h>
 #include <stdint.h>
 
-/**
+#include <sys/types.h>
+
+/*
  * Pointer to the current high watermark of the heap usage
  */
 static uint8_t *__sbrk_heap_end = NULL;
