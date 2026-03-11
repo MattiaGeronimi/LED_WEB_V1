@@ -93,7 +93,7 @@ int main(void)
   MX_USART1_UART_Init();
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
-
+  //FUNZIONA CON RETE SCUOLA
   ESP_Init("FABLAB-2-4", "fablab22");
 
   Server_Start();
