@@ -96,7 +96,7 @@ int main(void)
 
   ESP_Init("FABLAB-2-4", "fablab22");
 
-  Server_Start();
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -107,6 +107,7 @@ int main(void)
 	  /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+	  Server_Start();
   }
   /* USER CODE END 3 */
 }

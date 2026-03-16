@@ -21,22 +21,23 @@ extern UART_HandleTypeDef huart2;
 char buffer[20];
 
 
-char *Basic_inclusion = "<!DOCTYPE html> <html>\n<head><meta name=\"viewport\"\
-		content=\"width=device-width, initial-scale=1.0, user-scalable=no\">\n\
-		<title>LED CONTROL</title>\n<style>html { font-family: Helvetica; \
-		display: inline-block; margin: 0px auto; text-align: center;}\n\
-		body{margin-top: 50px;} h1 {color: #444444;margin: 50px auto 30px;}\
-		h3 {color: #444444;margin-bottom: 50px;}\n.button {display: block;\
-		width: 80px;background-color: #1abc9c;border: none;color: white;\
-		padding: 13px 30px;text-decoration: none;font-size: 25px;\
-		margin: 0px auto 35px;cursor: pointer;border-radius: 4px;}\n\
-		.button-on {background-color: #1abc9c;}\n.button-on:active \
-		{background-color: #16a085;}\n.button-off {background-color: #34495e;}\n\
-		.button-off:active {background-color: #2c3e50;}\np {font-size: 14px;color: #888;margin-bottom: 10px;}\n\
-		</style>\n</head>\n<body>\n<h1>ESP8266 LED CONTROL</h1>\n";
+char *Basic_inclusion = "<!DOCTYPE html> <html>\n\
+<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, user-scalable=no\">\n\
+<title>TERMOSTATO WEB CONTROL</title>\n\
+<style>html { font-family: Helvetica; display: inline-block; margin: 0px auto; text-align: center;}\n\
+body{margin-top: 50px;} h1 {color: #444444;margin: 50px auto 30px;}\n\
+h4 {color: #888; margin-top: -20px;}\n\
+.button {display: block; width: 80px; background-color: #1abc9c; border: none; color: white;\n\
+padding: 13px 30px; text-decoration: none; font-size: 25px; margin: 20px auto; cursor: pointer; border-radius: 4px;}\n\
+.button-on {background-color: #1abc9c;} .button-off {background-color: #34495e;}\n\
+p {font-size: 18px; color: #444; margin-bottom: 10px;}\n\
+.temp {font-size: 24px; font-weight: bold; color: #e67e22;}\n\
+</style></head>\n\
+<body>\n\
+<h1>TERMOSTATO WEB</h1>\n\
+<h4>Di: AGG</h4>";
 
-char *LED_ON = "<p>LED Status: ON</p><a class=\"button button-off\" href=\"/ledoff\">OFF</a>";
-char *LED_OFF = "<p>LED1 Status: OFF</p><a class=\"button button-on\" href=\"/ledon\">ON</a>";
+// Queste stringhe verranno composte dinamicamente nella funzione Server_Handle
 char *Terminate = "</body></html>";
 
 
@@ -121,31 +122,35 @@ int Server_Send (char *str, int Link_ID)
 
 void Server_Handle (char *str, int Link_ID)
 {
-	char datatosend[1024] = {0};
-	if (!(strcmp (str, "/ledon")))
-	{
-		sprintf (datatosend, Basic_inclusion);
-		strcat(datatosend, LED_ON);
-		strcat(datatosend, Terminate);
-		Server_Send(datatosend, Link_ID);
-	}
+    char datatosend[1024] = {0};
+    char temp_str[100];
 
-	else if (!(strcmp (str, "/ledoff")))
-	{
-		sprintf (datatosend, Basic_inclusion);
-		strcat(datatosend, LED_OFF);
-		strcat(datatosend, Terminate);
-		Server_Send(datatosend, Link_ID);
-	}
+    // Inizia con l'intestazione
+    strcpy(datatosend, Basic_inclusion);
 
-	else
-	{
-		sprintf (datatosend, Basic_inclusion);
-		strcat(datatosend, LED_OFF);
-		strcat(datatosend, Terminate);
-		Server_Send(datatosend, Link_ID);
-	}
+    // Aggiunge la temperatura corrente al corpo della pagina
+    // Versione senza bisogno del supporto float
+    float temperatura_attuale = 22.5;
+    int intero = (int)temperatura_attuale;
+    int decimale = (int)((temperatura_attuale - intero) * 10); // Prende la prima cifra decimale
 
+    sprintf(temp_str, "<p>Temperatura Corrente: <span class=\"temp\">%d.%d C</span></p>", intero, decimale);
+    strcat(datatosend, temp_str);
+
+    // Gestisce lo stato del LED e il bottone
+    if (!(strcmp (str, "/ledon")))
+    {
+        strcat(datatosend, "<p>Stato TERMOSTATO: <b>ON</b></p>");
+        strcat(datatosend, "<a class=\"button button-off\" href=\"/ledoff\">OFF</a>");
+    }
+    else
+    {
+        strcat(datatosend, "<p>Stato TERMOSTATO: <b>OFF</b></p>");
+        strcat(datatosend, "<a class=\"button button-on\" href=\"/ledon\">ON</a>");
+    }
+
+    strcat(datatosend, Terminate);
+    Server_Send(datatosend, Link_ID);
 }
 
 void Server_Start (void)
