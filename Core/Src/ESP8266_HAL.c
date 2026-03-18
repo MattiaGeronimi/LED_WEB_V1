@@ -86,24 +86,21 @@ int Server_Send (char *str, int Link_ID)
     int len = strlen (str);
     char data[40];
 
-    // Comunica all'ESP quanti byte stiamo per inviare
     sprintf (data, "AT+CIPSEND=%d,%d\r\n", Link_ID, len);
     Uart_sendstring(data, wifi_uart);
 
-    // Attende il simbolo '>' prima di inviare i dati
     while (!(Wait_for(">", wifi_uart)));
-
     Uart_sendstring (str, wifi_uart);
 
-    // Attende la conferma dell'invio
     while (!(Wait_for("SEND OK", wifi_uart)));
 
-    // Chiude la connessione specifica per liberare la memoria dell'ESP
+    // MODIFICA QUI: Invia il comando di chiusura ma NON bloccare il sistema con un Wait_for
     sprintf (data, "AT+CIPCLOSE=%d\r\n", Link_ID);
     Uart_sendstring(data, wifi_uart);
 
-    // NON aspettare l'OK qui se il browser ha già chiuso, altrimenti si blocca
-    // HAL_Delay(50);
+    // Un piccolo delay è più sicuro di un Wait_for infinito in questo caso
+    HAL_Delay(100);
+
     return 1;
 }
 
@@ -115,46 +112,34 @@ void Server_Handle (char *str, int Link_ID)
 
     if (termostato_attivo == 0)
     {
+        // SPEGNIMENTO TOTALE
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, 0); // LED Scheda
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_8, 0); // LED Breadboard
+
         strcat(datatosend, "<p>STATO: <b>OFF</b></p>");
         strcat(datatosend, "<a class=\"btn on\" href=\"/ledon\">ACCENDI</a>");
-        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, 0);
     }
     else
     {
         int temp_attuale = 225; // 22.5 C
-
-        // Formattazione super compatta
-        sprintf(temp_str,
-            "<p class=\"temp\">ORA: %d.%d C</p>"
-            "<p class=\"temp\">SET: %d.%d C</p>",
-            temp_attuale/10, temp_attuale%10, setpoint_decimi/10, setpoint_decimi%10);
-        strcat(datatosend, temp_str);
-
-        strcat(datatosend,
-            "<form action=\"/set\" method=\"GET\">"
-            "<input type=\"number\" name=\"t\" placeholder=\"es:215\" style=\"width:60px\">"
-            "<input type=\"submit\" value=\"SET\">"
-            "</form>");
-
-        if (temp_attuale < setpoint_decimi) {
-            HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, 1);
-            strcat(datatosend, "<p style='color:red'>ACCESO</p>");
-        } else {
-            HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, 0);
-            strcat(datatosend, "<p style='color:green'>SPENTO</p>");
-        }
-        // All'interno di Server_Handle, nella sezione "termostato_attivo == 1"
-
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, 1);
+        // Logica Riscaldamento
         if (temp_attuale < setpoint_decimi)
         {
-            // Se la temperatura è bassa, ACCENDI il LED (Riscaldamento ON)
-            HAL_GPIO_WritePin(GPIOA, GPIO_PIN_8, GPIO_PIN_SET);
+            HAL_GPIO_WritePin(GPIOA, GPIO_PIN_8, 1);
+            sprintf(temp_str, "<p class=\"temp\">ORA: %d.%d C</p><p style='color:red'>ACCESO</p>", temp_attuale/10, temp_attuale%10);
         }
         else
         {
-            // Se la temperatura è raggiunta, SPEGNI il LED (Riscaldamento OFF)
-            HAL_GPIO_WritePin(GPIOA, GPIO_PIN_8, GPIO_PIN_RESET);
+            HAL_GPIO_WritePin(GPIOA, GPIO_PIN_8, 0);
+            sprintf(temp_str, "<p class=\"temp\">ORA: %d.%d C</p><p style='color:green'>SPENTO</p>", temp_attuale/10, temp_attuale%10);
         }
+        strcat(datatosend, temp_str);
+
+        // Form impostazione
+        sprintf(temp_str, "<p>TARGET: %d.%d</p>", setpoint_decimi/10, setpoint_decimi%10);
+        strcat(datatosend, temp_str);
+        strcat(datatosend, "<form action=\"/set\" method=\"GET\"><input type=\"number\" name=\"t\" style=\"width:60px\"><input type=\"submit\" value=\"SET\"></form>");
 
         strcat(datatosend, "<a class=\"btn off\" href=\"/ledoff\">SPEGNI</a>");
     }
