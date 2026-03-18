@@ -1,11 +1,3 @@
-/*
- * ESP8266_HAL.c
- *
- *  Created on: Apr 14, 2020
- *      Author: Controllerstech
- */
-
-
 #include "UartRingbuffer_multi.h"
 #include "ESP8266_HAL.h"
 #include "stdio.h"
@@ -17,30 +9,22 @@ extern UART_HandleTypeDef huart2;
 #define wifi_uart &huart1
 #define pc_uart &huart2
 
-
+// Variabili globali per stabilità RAM
 char buffer[20];
+// Sostituisci queste righe all'inizio di ESP8266_HAL.c
+char datatosend[800]; // Ridotto a 800 per risparmiare RAM globale
+int termostato_attivo = 0;
+int setpoint_decimi = 200;
 
+// HTML più compatto (senza spazi inutili per risparmiare byte)
+char *Basic_inclusion = "<!DOCTYPE html><html><head>"
+"<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
+"<style>html{font-family:Helvetica;text-align:center;} "
+".btn{display:block;width:120px;color:#fff;padding:10px;text-decoration:none;margin:20px auto;border-radius:4px;} "
+".on{background:#1abc9c;}.off{background:#34495e;}.temp{font-size:22px;font-weight:bold;color:#e67e22;}</style>"
+"</head><body><h1>TERMOSTATO</h1>";
 
-char *Basic_inclusion = "<!DOCTYPE html> <html>\n\
-<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, user-scalable=no\">\n\
-<title>TERMOSTATO WEB CONTROL</title>\n\
-<style>html { font-family: Helvetica; display: inline-block; margin: 0px auto; text-align: center;}\n\
-body{margin-top: 50px;} h1 {color: #444444;margin: 50px auto 30px;}\n\
-h4 {color: #888; margin-top: -20px;}\n\
-.button {display: block; width: 80px; background-color: #1abc9c; border: none; color: white;\n\
-padding: 13px 30px; text-decoration: none; font-size: 25px; margin: 20px auto; cursor: pointer; border-radius: 4px;}\n\
-.button-on {background-color: #1abc9c;} .button-off {background-color: #34495e;}\n\
-p {font-size: 18px; color: #444; margin-bottom: 10px;}\n\
-.temp {font-size: 24px; font-weight: bold; color: #e67e22;}\n\
-</style></head>\n\
-<body>\n\
-<h1>TERMOSTATO WEB</h1>\n\
-<h4>Di: AGG</h4>";
-
-// Queste stringhe verranno composte dinamicamente nella funzione Server_Handle
 char *Terminate = "</body></html>";
-
-
 
 /*****************************************************************************************************************************************/
 
@@ -63,12 +47,10 @@ void ESP_Init (char *SSID, char *PASSWD)
 	while(!(Wait_for("AT\r\r\n\r\nOK\r\n", wifi_uart)));
 	Uart_sendstring("AT---->OK\n\n", pc_uart);
 
-
 	/********* AT+CWMODE=1 **********/
 	Uart_sendstring("AT+CWMODE=1\r\n", wifi_uart);
 	while (!(Wait_for("AT+CWMODE=1\r\r\n\r\nOK\r\n", wifi_uart)));
 	Uart_sendstring("CW MODE---->1\n\n", pc_uart);
-
 
 	/********* AT+CWJAP="SSID","PASSWD" **********/
 	Uart_sendstring("connecting... to the provided AP\n", pc_uart);
@@ -77,7 +59,6 @@ void ESP_Init (char *SSID, char *PASSWD)
 	while (!(Wait_for("WIFI GOT IP\r\n\r\nOK\r\n", wifi_uart)));
 	sprintf (data, "Connected to,\"%s\"\n\n", SSID);
 	Uart_sendstring(data,pc_uart);
-
 
 	/********* AT+CIFSR **********/
 	Uart_sendstring("AT+CIFSR\r\n", wifi_uart);
@@ -89,7 +70,6 @@ void ESP_Init (char *SSID, char *PASSWD)
 	sprintf (data, "IP ADDR: %s\n\n", buffer);
 	Uart_sendstring(data, pc_uart);
 
-
 	Uart_sendstring("AT+CIPMUX=1\r\n", wifi_uart);
 	while (!(Wait_for("AT+CIPMUX=1\r\r\n\r\nOK\r\n", wifi_uart)));
 	Uart_sendstring("CIPMUX---->OK\n\n", pc_uart);
@@ -99,84 +79,105 @@ void ESP_Init (char *SSID, char *PASSWD)
 	Uart_sendstring("CIPSERVER---->OK\n\n", pc_uart);
 
 	Uart_sendstring("Now Connect to the IP ADRESS\n\n", pc_uart);
-
 }
-
-
-
 
 int Server_Send (char *str, int Link_ID)
 {
-	int len = strlen (str);
-	char data[80];
-	sprintf (data, "AT+CIPSEND=%d,%d\r\n", Link_ID, len);
-	Uart_sendstring(data, wifi_uart);
-	while (!(Wait_for(">", wifi_uart)));
-	Uart_sendstring (str, wifi_uart);
-	while (!(Wait_for("SEND OK", wifi_uart)));
-	sprintf (data, "AT+CIPCLOSE=5\r\n");
-	Uart_sendstring(data, wifi_uart);
-	while (!(Wait_for("OK\r\n", wifi_uart)));
-	return 1;
+    int len = strlen (str);
+    char data[40];
+
+    // Comunica all'ESP quanti byte stiamo per inviare
+    sprintf (data, "AT+CIPSEND=%d,%d\r\n", Link_ID, len);
+    Uart_sendstring(data, wifi_uart);
+
+    // Attende il simbolo '>' prima di inviare i dati
+    while (!(Wait_for(">", wifi_uart)));
+
+    Uart_sendstring (str, wifi_uart);
+
+    // Attende la conferma dell'invio
+    while (!(Wait_for("SEND OK", wifi_uart)));
+
+    // Chiude la connessione specifica per liberare la memoria dell'ESP
+    sprintf (data, "AT+CIPCLOSE=%d\r\n", Link_ID);
+    Uart_sendstring(data, wifi_uart);
+
+    // NON aspettare l'OK qui se il browser ha già chiuso, altrimenti si blocca
+    // HAL_Delay(50);
+    return 1;
 }
 
 void Server_Handle (char *str, int Link_ID)
 {
-    char datatosend[1024] = {0};
-    char temp_str[100];
-
-    // Inizia con l'intestazione
+    char temp_str[150];
+    memset(datatosend, 0, sizeof(datatosend));
     strcpy(datatosend, Basic_inclusion);
 
-    // Aggiunge la temperatura corrente al corpo della pagina
-    // Versione senza bisogno del supporto float
-    float temperatura_attuale = 22.5;
-    int intero = (int)temperatura_attuale;
-    int decimale = (int)((temperatura_attuale - intero) * 10); // Prende la prima cifra decimale
-
-    sprintf(temp_str, "<p>Temperatura Corrente: <span class=\"temp\">%d.%d C</span></p>", intero, decimale);
-    strcat(datatosend, temp_str);
-
-    // Gestisce lo stato del LED e il bottone
-    if (!(strcmp (str, "/ledon")))
+    if (termostato_attivo == 0)
     {
-        strcat(datatosend, "<p>Stato TERMOSTATO: <b>ON</b></p>");
-        strcat(datatosend, "<a class=\"button button-off\" href=\"/ledoff\">OFF</a>");
+        strcat(datatosend, "<p>STATO: <b>OFF</b></p>");
+        strcat(datatosend, "<a class=\"btn on\" href=\"/ledon\">ACCENDI</a>");
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, 0);
     }
     else
     {
-        strcat(datatosend, "<p>Stato TERMOSTATO: <b>OFF</b></p>");
-        strcat(datatosend, "<a class=\"button button-on\" href=\"/ledon\">ON</a>");
+        int temp_attuale = 225; // 22.5 C
+
+        // Formattazione super compatta
+        sprintf(temp_str,
+            "<p class=\"temp\">ORA: %d.%d C</p>"
+            "<p class=\"temp\">SET: %d.%d C</p>",
+            temp_attuale/10, temp_attuale%10, setpoint_decimi/10, setpoint_decimi%10);
+        strcat(datatosend, temp_str);
+
+        strcat(datatosend,
+            "<form action=\"/set\" method=\"GET\">"
+            "<input type=\"number\" name=\"t\" placeholder=\"es:215\" style=\"width:60px\">"
+            "<input type=\"submit\" value=\"SET\">"
+            "</form>");
+
+        if (temp_attuale < setpoint_decimi) {
+            HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, 1);
+            strcat(datatosend, "<p style='color:red'>ACCESO</p>");
+        } else {
+            HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, 0);
+            strcat(datatosend, "<p style='color:green'>SPENTO</p>");
+        }
+
+        strcat(datatosend, "<a class=\"btn off\" href=\"/ledoff\">SPEGNI</a>");
     }
 
-    strcat(datatosend, Terminate);
+    strcat(datatosend, "</body></html>");
     Server_Send(datatosend, Link_ID);
 }
-
 void Server_Start (void)
 {
-	char buftocopyinto[64] = {0};
+	char buftocopyinto[128] = {0};
 	char Link_ID;
-	while (!(Get_after("+IPD,", 1, &Link_ID, wifi_uart)));
+	if (!(Get_after("+IPD,", 1, &Link_ID, wifi_uart))) return;
 	Link_ID -= 48;
 	while (!(Copy_upto(" HTTP/1.1", buftocopyinto, wifi_uart)));
+
 	if (Look_for("/ledon", buftocopyinto) == 1)
 	{
-		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, 1);
-		Server_Handle("/ledon",Link_ID);
+		termostato_attivo = 1;
+		Server_Handle("/ledon", Link_ID);
 	}
-
 	else if (Look_for("/ledoff", buftocopyinto) == 1)
 	{
-		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, 0);
-		Server_Handle("/ledoff",Link_ID);
+		termostato_attivo = 0;
+		Server_Handle("/ledoff", Link_ID);
 	}
-
+	else if (Look_for("/set?t=", buftocopyinto) == 1)
+	{
+		char *ptr = strstr(buftocopyinto, "t=");
+		if (ptr != NULL) sscanf(ptr, "t=%d", &setpoint_decimi);
+		termostato_attivo = 1;
+		Server_Handle("/set", Link_ID);
+	}
 	else if (Look_for("/favicon.ico", buftocopyinto) == 1);
-
 	else
 	{
-		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, 0);
-		Server_Handle("/ ", Link_ID);
+		Server_Handle("/", Link_ID);
 	}
 }
