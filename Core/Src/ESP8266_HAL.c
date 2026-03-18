@@ -143,6 +143,18 @@ void Server_Handle (char *str, int Link_ID)
             HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, 0);
             strcat(datatosend, "<p style='color:green'>SPENTO</p>");
         }
+        // All'interno di Server_Handle, nella sezione "termostato_attivo == 1"
+
+        if (temp_attuale < setpoint_decimi)
+        {
+            // Se la temperatura è bassa, ACCENDI il LED (Riscaldamento ON)
+            HAL_GPIO_WritePin(GPIOA, GPIO_PIN_8, GPIO_PIN_SET);
+        }
+        else
+        {
+            // Se la temperatura è raggiunta, SPEGNI il LED (Riscaldamento OFF)
+            HAL_GPIO_WritePin(GPIOA, GPIO_PIN_8, GPIO_PIN_RESET);
+        }
 
         strcat(datatosend, "<a class=\"btn off\" href=\"/ledoff\">SPEGNI</a>");
     }
