@@ -121,7 +121,9 @@ void Server_Handle (char *str, int Link_ID)
     }
     else
     {
-        int temp_attuale = 225; // 22.5 C
+    	uint32_t adc_val = read_adc();
+    	    // Calcolo temperatura in decimi (es: 22.5°C -> 225)
+		int temp_attuale = (int)((adc_val * 330.0) / 4095.0);
         HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, 1);
         // Logica Riscaldamento
         if (temp_attuale < setpoint_decimi)
